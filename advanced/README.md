@@ -9,6 +9,10 @@ Redis를 운영 환경에서 안전하게 사용하기 위한 필수 개념들�
 3. [Transactions (트랜잭션)](#3-transactions-트랜잭션)
 4. [Pipelining (파이프라이닝)](#4-pipelining-파이프라이닝)
 5. [Atomic 연산](#5-atomic-연산)
+6. [대규모 트래픽을 위한 캐싱 전략](#6-대규모-트래픽을-위한-캐싱-전략)
+7. [메모리 관리 및 축출 정책](#7-메모리-관리-및-축출-정책-eviction-policies)
+8. [성능 킬러: Big Key & Hot Key](#8-성능-킬러-big-key--hot-key)
+9. [클라이언트 사이드 캐싱](#9-클라이언트-사이드-캐싱-client-side-caching)
 
 ---
 
@@ -452,6 +456,119 @@ else:
 
 ---
 
+## 6. 대규모 트래픽을 위한 캐싱 전략
+
+대규모 트래픽 환경에서 Redis를 효과적으로 사용하기 위한 패턴과 문제 해결 전략입니다.
+
+### 🔸 기본 캐싱 패턴
+
+#### Cache-Aside (Lazy Loading)
+가장 일반적으로 사용되는 패턴입니다.
+
+1. App이 Cache(Redis) 조회
+2. **Cache Miss**: DB 조회
+3. DB에서 읽은 데이터를 Cache에 저장
+4. **Cache Hit**: Cache 데이터 반환
+
+**특징**:
+- 필요한 데이터만 캐시에 적재됨 (메모리 효율적)
+- 캐시 장애 시에도 DB를 통해 서비스 지속 가능 (DB 부하 급증 주의)
+- 데이터 정합성 문제 발생 가능 (DB 업데이트 시 캐시 갱신 필요)
+
+### 🔸 쓰기 전략 (Write Strategies)
+
+#### Write-Through
+데이터를 쓸 때 Cache와 DB에 **동시에** 씁니다.
+
+- **장점**: 캐시와 DB의 **일관성(Consistency)**이 높음
+- **단점**: 쓰기 속도가 느림 (두 곳에 써야 함), 자주 조회되지 않는 데이터도 캐시에 저장될 수 있음
+
+#### Write-Back (Write-Behind)
+Cache에만 먼저 쓰고, 나중에 **비동기**로 DB에 씁니다.
+
+- **장점**: 쓰기 속도가 매우 빠름 (Disk I/O 불필요)
+- **단점**: 캐시 장애 시 **데이터 손실** 위험이 큼 (DB 반영 전 유실)
+- **용도**: 로그 수집, 조회수 카운트 등
+
+### 🔸 대규모 트래픽 문제 및 해결책
+
+#### 1. 캐시 스탬피드 (Cache Stampede / Thundering Herd)
+특정 인기 키(Hot Key)가 만료되는 순간, 수많은 동시 요청이 DB로 몰려 병목을 유발하는 현상입니다.
+
+**해결책**:
+- **Probabilistic Early Expiration**: 만료 시간(TTL) 전에 확률적으로 일찍 갱신 (PER 알고리즘)
+- **Mutex Lock**: 락을 획득한 하나의 프로세스만 DB를 조회하고 나머지는 대기
+
+#### 2. 캐시 관통 (Cache Penetration)
+DB에도 **없는 키**에 대한 악의적이거나 잦은 요청이 계속 들어와, 캐시를 뚫고 DB를 공격하는 현상입니다.
+
+**해결책**:
+- **Bloom Filter**: 해당 키가 존재하는지 확률적으로 빠르게 판단하여 불필요한 DB 조회 차단
+- **Null Object Caching**: DB에 값이 없다는 사실(`null` 등) 자체를 캐싱 (TTL을 짧게 설정)
+
+#### 3. 캐시 애벌랜치 (Cache Avalanche)
+비슷한 시점에 **대량의 키가 한꺼번에 만료**되어 DB 부하가 폭증하는 현상입니다.
+
+**해결책**:
+- **Jitter (지터)**: 캐시 만료 시간(TTL)에 무작위 값을 더해 만료 시점을 분산시킴
+  - 예: `TTL = 3600s + random(0~600s)`
+
+---
+
+## 7. 메모리 관리 및 축출 정책 (Eviction Policies)
+
+Redis는 메모리가 가득 찼을 때(`maxmemory` 도달), 데이터 저장을 계속하기 위해 기존 데이터를 삭제(Eviction)하는 정책을 설정할 수 있습니다.
+
+### 주요 정책(`maxmemory-policy`)
+
+1. **noeviction (기본값)**: 데이터를 삭제하지 않음. 쓰기 요청 시 에러(`OOM command not allowed`) 반환. (가장 안전하지만 서비스 중단 위험)
+2. **allkeys-lru**: **모든 키** 중에서 가장 오랫동안 사용되지 않은(LRU) 키를 삭제. (캐시 용도로 가장 권장)
+3. **volatile-lru**: **EXPRIE(만료 시간)가 설정된 키** 중에서 LRU 키를 삭제. (영구 보존 데이터가 있는 경우 유용)
+4. **allkeys-lfu**: 사용 빈도가 가장 적은(LFU) 키를 삭제. (자주 조회되는 데이터 보존에 유리)
+5. **volatile-ttl**: 만료 시간(TTL)이 가장 짧게 남은 키부터 삭제.
+
+> 💡 **운영 Tip**: 캐시로만 사용한다면 `allkeys-lru`가 일반적이지만, 접근 패턴에 따라 `allkeys-lfu`가 더 효율적일 수 있습니다.
+
+---
+
+## 8. 성능 킬러: Big Key & Hot Key
+
+Redis는 **Single Thread**이므로 하나의 무거운 명령이 전체 시스템을 멈추게 할 수 있습니다.
+
+### 🚫 Big Key 문제
+값이 매우 큰 키(예: 멤버가 100만 명인 Set, 50MB String)를 다룰 때 발생합니다.
+
+- **위험**:
+  - `DEL`: 메모리 해제 시 메인 스레드가 차단됨.
+  - `HGETALL`, `SMEMBERS`: 데이터를 전송하는 데 시간이 오래 걸려 다른 요청들이 타임아웃 발생.
+- **해결책**:
+  - **쪼개기**: 하나의 큰 키 대신 여러 개의 작은 키로 분할 저장.
+  - **UNLINK 사용**: `DEL` 대신 `UNLINK`를 사용하면 백그라운드에서 비동기로 메모리를 해제함.
+  - **SCAN 사용**: `KEYS *` 대신 `SCAN`, `HSCAN`, `SSCAN`으로 반복해서 조금씩 조회.
+
+### 🔥 Hot Key 문제
+특정 키 하나에 트래픽이 집중되어 네트워크 대역폭이나 CPU가 병목이 되는 현상입니다.
+
+- **해결책**:
+  - **Local Caching**: 애플리케이션 메모리(전역 변수 등)에 해당 키를 짧게 캐싱하여 Redis 요청을 줄임.
+  - **Clustering & Replication**: 읽기 분산을 위해 Replica를 활용 (단, 키 자체가 하나라 샤딩 효과는 없음).
+
+---
+
+## 9. 클라이언트 사이드 캐싱 (Client-Side Caching)
+
+Redis 6.0부터 도입된 기능으로, 자주 조회되는 데이터를 애플리케이션 메모리(로컬 캐시)에 저장하고, 데이터 변경 시 Redis거 알림(Invalidation Message)을 보내는 방식입니다.
+
+- **장점**: Network RTT(왕복 시간)가 0에 수렴. Redis 부하 획기적 감소.
+- **동작**:
+  1. 클라이언트가 키를 조회하고 로컬에 저장.
+  2. Redis는 해당 키를 "추적(Tracking)" 목록에 등록.
+  3. 다른 클라이언트가 해당 키를 변경하면, Redis가 추적 중인 클라이언트에게 "무효화(Invalidate)" 메시지 전송.
+  4. 클라이언트는 로컬 캐시에서 해당 키를 삭제.
+
+---
+
+
 ## 📚 참고 자료
 
 - [Redis Persistence 공식 문서](https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/)
@@ -476,3 +593,10 @@ else:
 - [ ] Pipelining과 Transaction의 차이를 설명할 수 있다
 - [ ] Atomic 연산의 중요성을 이해한다
 - [ ] Lua Script로 복잡한 원자적 연산을 구현할 수 있다
+- [ ] Cache-Aside 패턴을 이해하고 구현할 수 있다
+- [ ] Write-Through와 Write-Back의 차이를 설명할 수 있다
+- [ ] 캐시 스탬피드, 관통, 애벌랜치 현상과 해결책을 안다
+- [ ] Bloom Filter와 Null Object Caching의 용도를 이해한다
+- [ ] Eviction Policy(allkeys-lru 등)를 설명할 수 있다
+- [ ] Big Key 삭제 시 DEL 대신 UNLINK를 사용해야 하는 이유를 안다
+- [ ] SCAN 명령어를 사용하여 대량 데이터를 안전하게 조회할 수 있다
