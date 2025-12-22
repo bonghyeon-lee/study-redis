@@ -75,3 +75,33 @@
     - Redis 사용 시 DB RTT(네트워크 응답 시간)를 획기적으로 줄여, 유저 상태 관리 및 로그성 데이터 저장에서 **약 30배 이상의 성능 향상** 효과를 확인.
     - 특히 Search 기능의 경우 `LPUSH` + `LTRIM` 두 가지 연산을 `Pipeline`으로 묶어 단 한 번의 통신으로 처리함으로써 처리량(Throughput) 최적화를 입증.
 
+---
+
+## 🔴 Level 3: 동시성 제어 및 실시간 랭킹 (Advanced)
+**"Race Condition 상황에서도 정확하고 빠른 데이터 처리를 수행한다."**
+
+### 1. 구현 내용
+- **`RankingModule` (Sorted Set)**: 실시간 리더보드 구현.
+    - `ZADD`/`ZINCRBY`를 사용하여 점수 업데이트와 순위 계산을 Redis 내부에서 처리.
+    - `ZREVRANGE`를 통한 상위 랭커 조회 최적화.
+- **`CouponModule` (Lua Script)**: 원자적 쿠폰 발급 시스템.
+    - **Lua Script**: `GET` -> `SISMEMBER` -> `INCR` -> `SADD` 과정을 하나의 원자적 연산으로 통합.
+    - 발급 한도(100개) 초과 및 중복 발급을 비즈니스 로직 레벨이 아닌 Redis 엔진 레벨에서 완벽히 방어.
+
+### 2. 검증 결과
+#### 🧪 Unit Test
+- **결과**: `RankingService`, `CouponService` 전체 합격 (5 tests passed).
+- **특이사항**: `ioredis-mock`을 활용하여 Lua 스크립트 실행 로직 및 Sorted Set 동작 검증.
+
+#### ⚡ Load Test (k6)
+- **Ranking Scenario (`test:load:ranking`)**:
+    - **Redis (ZSet)**: p(95) **1.23ms**
+    - **Uncached (Map)**: p(95) **51.35ms** (~40배 성능 차이)
+- **Coupon Scenario (`test:load:coupon`)** - **Critical Verification**:
+    - **설정**: 100개 한정 쿠폰에 대해 초당 500회 이상의 동시 요청(Total 10,000건) 발생.
+    - **Redis (Lua)**: 최종 발급 수 **100/100** (초과 발급 0건)
+    - **Uncached (No Lock)**: 최종 발급 수 **104/100** (**초과 발급 4건 발생**)
+- **결과 요약**: 
+    - 고성능 처리가 필요한 랭킹 서비스에서 Redis의 강력한 성능을 확인.
+    - 특히 분산 환경에서 발생할 수 있는 Race Condition 문제를 Lua Script라는 원자적 도구로 완벽하게 해결할 수 있음을 입증.
+

@@ -3,8 +3,6 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from './../src/app.module';
 import { NoticesService } from './../src/notices/notices.service';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Cache } from 'cache-manager';
 import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
 import Redis from 'ioredis';
 

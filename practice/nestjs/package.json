@@ -21,7 +21,9 @@
     "build:k6": "node build-k6.js",
     "test:load:notice": "npm run build:k6 && docker run --rm -i -v $(pwd)/dist/k6:/dist -w /dist --add-host=host.docker.internal:host-gateway grafana/k6 run notices.js",
     "test:load:otp": "npm run build:k6 && docker run --rm -i -v $(pwd)/dist/k6:/dist -w /dist --add-host=host.docker.internal:host-gateway grafana/k6 run otp.js",
-    "test:load:search": "npm run build:k6 && docker run --rm -i -v $(pwd)/dist/k6:/dist -w /dist --add-host=host.docker.internal:host-gateway grafana/k6 run search.js"
+    "test:load:search": "npm run build:k6 && docker run --rm -i -v $(pwd)/dist/k6:/dist -w /dist --add-host=host.docker.internal:host-gateway grafana/k6 run search.js",
+    "test:load:ranking": "npm run build:k6 && docker run --rm -i -v $(pwd)/dist/k6:/dist -w /dist --add-host=host.docker.internal:host-gateway grafana/k6 run ranking.js",
+    "test:load:coupon": "npm run build:k6 && docker run --rm -i -v $(pwd)/dist/k6:/dist -w /dist --add-host=host.docker.internal:host-gateway grafana/k6 run coupon.js"
   },
   "dependencies": {
     "@nestjs/cache-manager": "^2.3.0",

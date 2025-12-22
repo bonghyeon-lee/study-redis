@@ -8,6 +8,8 @@ import { RedisModule } from './common/redis.module';
 
 import { AuthModule } from './auth/auth.module';
 import { SearchModule } from './search/search.module';
+import { RankingModule } from './ranking/ranking.module';
+import { CouponModule } from './coupon/coupon.module';
 
 @Module({
   imports: [
@@ -27,6 +29,8 @@ import { SearchModule } from './search/search.module';
     NoticesModule,
     AuthModule,
     SearchModule,
+    RankingModule,
+    CouponModule,
   ],
   controllers: [AppController],
   providers: [AppService],

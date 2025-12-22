@@ -4,7 +4,9 @@ esbuild.build({
     entryPoints: {
         notices: 'test/load/notices.k6.ts',
         otp: 'test/load/otp.k6.ts',
-        search: 'test/load/search.k6.ts'
+        search: 'test/load/search.k6.ts',
+        ranking: 'test/load/ranking.k6.ts',
+        coupon: 'test/load/coupon.k6.ts'
     },
     bundle: true,
     outdir: 'dist/k6',
