@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseInterceptors,
+} from '@nestjs/common';
 import { NoticesService } from './notices.service';
 import { CreateNoticeDto } from './dto/create-notice.dto';
 import { UpdateNoticeDto } from './dto/update-notice.dto';
@@ -6,7 +15,7 @@ import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
 
 @Controller('notices')
 export class NoticesController {
-  constructor(private readonly noticesService: NoticesService) { }
+  constructor(private readonly noticesService: NoticesService) {}
 
   @Post()
   create(@Body() createNoticeDto: CreateNoticeDto) {

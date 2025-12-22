@@ -11,7 +11,7 @@ export class NoticesService {
     { id: 2, title: 'Level 1', content: 'Caching Basics' },
   ];
 
-  constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) { }
+  constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
 
   async create(createNoticeDto: CreateNoticeDto) {
     const newNotice = {
@@ -28,7 +28,7 @@ export class NoticesService {
 
   async findAll() {
     // Simulate DB Latency (e.g. 50ms)
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, 50));
     return this.notices;
   }
 
@@ -36,7 +36,8 @@ export class NoticesService {
     return `This action returns a #${id} notice`;
   }
 
-  update(id: number, updateNoticeDto: UpdateNoticeDto) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  update(id: number, _updateNoticeDto: UpdateNoticeDto) {
     return `This action updates a #${id} notice`;
   }
 

@@ -29,15 +29,20 @@ Each level will be implemented using **TDD (Test Driven Development)** for funct
 
 ### 1. Functional Implementation (TDD)
 - **Feature:** OTP Verification & User Search History
-- **Tests:**
-    - `should store OTP with 3min TTL (SETEX)`
-    - `should fail verification with wrong OTP and NOT delete key`
-    - `should succeed verification and delete key immediately`
-    - `should keep only latest 5 search terms (LPUSH + LTRIM)`
+- **Tests (Implemented):**
+    - `should generate and store OTP with 3min TTL (SETEX)`
+    - `should verify OTP correctly and delete it from Redis immediately`
+    - `should return false for invalid OTP and maintain key persistence`
+    - `should add keywords and maintain only 5 latest items (LPUSH + LTRIM)`
+    - `should utilize Pipeline to reduce RTT during search history updates`
 
 ### 2. E2E & Load Testing
-- **Scenario:** 1,000 users requesting OTPs simultaneously.
-- **Verification:** Ensure no data race conditions where deleted keys are accessed.
+- **Scenario:** 
+    - **OTP Stress (`test:load:otp`)**: 50 req/s to verify high-frequency SETEX/GET/DEL operations.
+    - **Search Stress (`test:load:search`)**: 100 req/s to measure performance gains from atomicity and RTT reduction.
+- **Verification:**
+    - Redis (OTP/Search): p(95) < 10ms.
+    - Uncached (Simulated DB): p(95) > 50ms.
 
 ---
 

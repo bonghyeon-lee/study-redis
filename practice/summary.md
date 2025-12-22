@@ -44,3 +44,34 @@
     2.  **Invalidation**: `POST` 요청 후 `GET` 요청 시 DB 조회(Service 호출) 발생 확인.
     3.  **TTL (Time-To-Live)**: Redis 키 조회(`ttl`)를 통해 5분(300s) 설정 확인.
 - **Dependency Issue**: `cache-manager` v6+와 `ioredis` 연동 문제 발생 → Stable Version(`@nestjs/cache-manager@2` + `cache-manager@5`)으로 다운그레이드하여 해결.
+
+---
+
+## 🟡 Level 2: 상태 및 세션 관리 (Intermediate)
+**"유효 시간이 있는 휘발성 데이터를 안전하고 빠르게 관리한다."**
+
+### 1. 구현 내용
+- **`AuthModule` (OTP)**: 이메일 인증 절차 구현.
+    - `SETEX`를 사용하여 3분(180초) TTL 설정.
+    - 검증 성공 시 `DEL` 명령어로 즉시 데이터 폐기.
+- **`SearchModule` (History)**: 유저별 최근 검색어 5개 유지.
+    - `List` 자료구조 활용 (`LPUSH` + `LTRIM`).
+    - `Pipeline`을 적용하여 네트워크 RTT 최적화 (배치 작업).
+- **`RedisModule`**: `ioredis` 클라이언트를 전역적으로 주입받아 사용할 수 있도록 공통 모듈화.
+
+### 2. 검증 결과
+#### 🧪 Unit Test
+- **Tools**: `Vitest`, `ioredis-mock`
+- **결과**: `AuthService` 및 `SearchService` 로직 검증 완료 (5 tests passed).
+
+#### ⚡ Load Test (k6)
+- **OTP Scenario (`test:load:otp`)**:
+    - **Redis**: p(95) **2.0ms**
+    - **Uncached (Simulated DB)**: p(95) **52.42ms**
+- **Search Scenario (`test:load:search`)**:
+    - **Redis (Pipelined)**: p(95) **1.83ms**
+    - **Uncached**: p(95) **51.75ms**
+- **결과 요약**: 
+    - Redis 사용 시 DB RTT(네트워크 응답 시간)를 획기적으로 줄여, 유저 상태 관리 및 로그성 데이터 저장에서 **약 30배 이상의 성능 향상** 효과를 확인.
+    - 특히 Search 기능의 경우 `LPUSH` + `LTRIM` 두 가지 연산을 `Pipeline`으로 묶어 단 한 번의 통신으로 처리함으로써 처리량(Throughput) 최적화를 입증.
+

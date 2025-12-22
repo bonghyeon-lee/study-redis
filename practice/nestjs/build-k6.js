@@ -1,11 +1,13 @@
-
 const esbuild = require('esbuild');
 
 esbuild.build({
-    entryPoints: ['test/load/notices.k6.ts'],
+    entryPoints: {
+        notices: 'test/load/notices.k6.ts',
+        otp: 'test/load/otp.k6.ts',
+        search: 'test/load/search.k6.ts'
+    },
     bundle: true,
-    outfile: 'dist/k6/notices.js',
+    outdir: 'dist/k6',
     platform: 'node',
-    target: 'es2015',
-    external: ['k6', 'k6/*'], // k6 modules are external
+    external: ['k6', 'k6/http', 'k6/execution'],
 }).catch(() => process.exit(1));
