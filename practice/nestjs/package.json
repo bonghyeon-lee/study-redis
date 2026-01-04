@@ -23,7 +23,8 @@
     "test:load:otp": "npm run build:k6 && docker run --rm -i -v $(pwd)/dist/k6:/dist -w /dist --add-host=host.docker.internal:host-gateway grafana/k6 run otp.js",
     "test:load:search": "npm run build:k6 && docker run --rm -i -v $(pwd)/dist/k6:/dist -w /dist --add-host=host.docker.internal:host-gateway grafana/k6 run search.js",
     "test:load:ranking": "npm run build:k6 && docker run --rm -i -v $(pwd)/dist/k6:/dist -w /dist --add-host=host.docker.internal:host-gateway grafana/k6 run ranking.js",
-    "test:load:coupon": "npm run build:k6 && docker run --rm -i -v $(pwd)/dist/k6:/dist -w /dist --add-host=host.docker.internal:host-gateway grafana/k6 run coupon.js"
+    "test:load:coupon": "npm run build:k6 && docker run --rm -i -v $(pwd)/dist/k6:/dist -w /dist --add-host=host.docker.internal:host-gateway grafana/k6 run coupon.js",
+    "test:ha": "npx ts-node test/ha-availability.ts"
   },
   "dependencies": {
     "@nestjs/cache-manager": "^2.3.0",
